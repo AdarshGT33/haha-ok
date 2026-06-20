@@ -4,9 +4,10 @@ import { NextRequest } from 'next/server'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser()
+  const { id } = await params
   if (!user) return new Response('Unauthorized', { status: 401 })
 
   const { firstMessage } = await req.json()
@@ -36,7 +37,7 @@ export async function PATCH(
   const { error } = await supabaseAdmin
     .from('conversations')
     .update({ title })
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
 
   if (error) return new Response('DB error', { status: 500 })
