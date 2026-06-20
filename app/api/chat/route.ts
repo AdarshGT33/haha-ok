@@ -124,7 +124,9 @@ export async function POST(req: NextRequest) {
   })
 
   if (!groqRes.ok || !groqRes.body) {
-    return new Response('Groq error', { status: 500 })
+    const errorText = await groqRes.text()
+    console.error('Groq error:', groqRes.status, errorText)
+    return new Response(`Groq error: ${errorText}`, { status: 500 })
   }
 
   let fullAssistantMessage = ''
