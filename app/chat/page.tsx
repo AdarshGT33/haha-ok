@@ -30,8 +30,14 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [rateLimited, setRateLimited] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [pendingNewChat, setPendingNewChat] = useState(false)
+
+  const showToast = (msg: string) => {
+  setToast(msg)
+  setTimeout(() => setToast(null), 4000)
+}
 
   // Load conversations on mount
   useEffect(() => {
@@ -109,6 +115,12 @@ export default function ChatPage() {
       setIsStreaming(false)
       return
     }
+    if (res.status === 500) {
+        setMessages(prev => prev.slice(0, -1))
+        showToast('Something went wrong on our end. Try again in a moment.')
+        setIsStreaming(false)
+        return
+      }
 
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
@@ -124,8 +136,10 @@ export default function ChatPage() {
         { role: 'assistant', content: assistantText },
       ])
     }
-  } catch (err) {
+ } catch (err) {
     console.error(err)
+    setMessages(prev => prev.slice(0, -1)) // remove empty assistant bubble
+    showToast('Something went wrong on our end. Try again in a moment.')
   } finally {
     setIsStreaming(false)
     // Refresh usage count after each message
@@ -330,6 +344,12 @@ export default function ChatPage() {
           </>
         )}
       </div>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 text-zinc-100 text-sm px-5 py-3 rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-bottom-2">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

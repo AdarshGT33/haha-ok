@@ -19,7 +19,7 @@ export async function PATCH(
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gemma2-9b-it',
+      model: 'llama-3.1-8b-instant',
       messages: [
         {
           role: 'user',

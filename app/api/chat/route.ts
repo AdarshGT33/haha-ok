@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gemma2-9b-it',
+      model: 'llama-3.1-8b-instant',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         ...messages.map((m: { role: string; content: string }) => ({
@@ -126,13 +126,14 @@ export async function POST(req: NextRequest) {
   if (!groqRes.ok || !groqRes.body) {
     const errorText = await groqRes.text()
     console.error('Groq error:', groqRes.status, errorText)
-    return new Response(`Groq error: ${errorText}`, { status: 500 })
+    return new Response('AI_ERROR', { status: 500 })
   }
 
   let fullAssistantMessage = ''
 
   const stream = new ReadableStream({
-    async start(controller) {
+  async start(controller) {
+    try {
       const reader = groqRes.body!.getReader()
       const decoder = new TextDecoder()
 
@@ -168,8 +169,18 @@ export async function POST(req: NextRequest) {
       })
 
       controller.close()
-    },
-  })
+    } catch (streamErr) {
+      console.error('Stream error:', streamErr)
+      controller.error(streamErr)
+    }
+  },
+})
+
+      await supabaseAdmin.from('messages').insert({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: fullAssistantMessage,
+      })
 
   return new Response(stream, {
     headers: {
@@ -178,7 +189,7 @@ export async function POST(req: NextRequest) {
     },
   })
   } catch (err) {
-    console.error(err)
+    console.error('Chat route error:', err)
     return new Response('Internal Server Error', { status: 500 })
   }
 }
