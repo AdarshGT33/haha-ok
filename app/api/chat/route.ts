@@ -130,9 +130,12 @@ export async function POST(req: NextRequest) {
   }
 
   let fullAssistantMessage = ''
+  const encoder = new TextEncoder()
+  const { readable, writable } = new TransformStream()
+  const writer = writable.getWriter()
 
-  const stream = new ReadableStream({
-  async start(controller) {
+  // Process stream in background
+  ;(async () => {
     try {
       const reader = groqRes.body!.getReader()
       const decoder = new TextDecoder()
@@ -141,7 +144,7 @@ export async function POST(req: NextRequest) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value)
+        const chunk = decoder.decode(value, { stream: true })
         const lines = chunk.split('\n').filter(Boolean)
 
         for (const line of lines) {
@@ -154,7 +157,7 @@ export async function POST(req: NextRequest) {
             const token = json.choices?.[0]?.delta?.content ?? ''
             if (token) {
               fullAssistantMessage += token
-              controller.enqueue(new TextEncoder().encode(token))
+              await writer.write(encoder.encode(token))
             }
           } catch {
             // skip malformed lines
@@ -167,25 +170,17 @@ export async function POST(req: NextRequest) {
         role: 'assistant',
         content: fullAssistantMessage,
       })
-
-      controller.close()
     } catch (streamErr) {
       console.error('Stream error:', streamErr)
-      controller.error(streamErr)
+    } finally {
+      await writer.close()
     }
-  },
-})
+  })()
 
-      await supabaseAdmin.from('messages').insert({
-        conversation_id: conversationId,
-        role: 'assistant',
-        content: fullAssistantMessage,
-      })
-
-  return new Response(stream, {
+  return new Response(readable, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Transfer-Encoding': 'chunked',
+      'X-Content-Type-Options': 'nosniff',
     },
   })
   } catch (err) {
